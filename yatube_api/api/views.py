@@ -1,13 +1,13 @@
 # TODO:  Напишите свой вариант
-import sys
 
 from django.contrib.auth.models import User
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from posts.models import Post, Group, Comment, Follow
-from rest_framework import viewsets, status
-from rest_framework.pagination import PageNumberPagination
+from rest_framework import viewsets, status, filters
+from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
 from .permissions import AuthorOrReadOnly, ReadOnly
@@ -18,7 +18,7 @@ from .serializers import PostSerializer, CommentSerializer, FollowSerializer, \
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    pagination_class = PageNumberPagination
+    pagination_class = LimitOffsetPagination
     permission_classes = (AuthorOrReadOnly,)
 
     def perform_create(self, serializer):
@@ -28,17 +28,14 @@ class PostViewSet(viewsets.ModelViewSet):
 class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    pagination_class = PageNumberPagination
     permission_classes = (ReadOnly,)
 
 
 class FollowViewSet(viewsets.ModelViewSet):
     queryset = Follow.objects.all()
     serializer_class = FollowSerializer
-    pagination_class = PageNumberPagination
-    filter_backends = (DjangoFilterBackend,)
-    # filterset_fields = ('color', 'birth_year')
-    search_fields = ('user',)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter)
+    search_fields = ('following__username',)
 
     def get_queryset(self):
         current_user = self.request.user
@@ -50,6 +47,9 @@ class FollowViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         try:
             self.perform_create(serializer)
+        except ValidationError as e:
+            return Response({'Error': e.detail},
+                            status=status.HTTP_400_BAD_REQUEST)
         except Http404 as e:
             return Response({'Error': str(e)},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -62,17 +62,16 @@ class FollowViewSet(viewsets.ModelViewSet):
                                       username=self.request.data.get(
                                           'following'))
         if Follow.objects.filter(user=self.request.user,
-                                     following=following):
-            raise Http404('Вы уже подписаны на этого автора.')
+                                 following=following):
+            raise ValidationError('Вы уже подписаны на этого автора.')
         if self.request.user == following:
-            raise Http404('Вы не можете подписаться на себя.')
+            raise ValidationError('Вы не можете подписаться на себя.')
         serializer.save(user=self.request.user, following=following)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    pagination_class = PageNumberPagination
     permission_classes = (AuthorOrReadOnly,)
 
     def get_queryset(self):
