@@ -25,14 +25,6 @@ class CommentSerializer(serializers.ModelSerializer):
     )
     post = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
 
-    def validate(self, data):
-        post_id = self.context['view'].kwargs.get('post_id')  # Не знаю,
-        # насколько правильно вытаскивать kwargs из вью, но придумал только так
-        # ¯\_(ツ)_/¯
-        if not Post.objects.filter(pk=post_id):
-            raise serializers.ValidationError('Пост не найден.')
-        return data
-
     class Meta:
         fields = '__all__'
         model = Comment

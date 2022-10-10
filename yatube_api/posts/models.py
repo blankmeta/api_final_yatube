@@ -25,14 +25,6 @@ class Follow(models.Model):
         related_name='following'
     )
 
-    # class Meta:
-    #     constraints = [
-    #         models.UniqueConstraint(
-    #             fields=('user', 'following'),
-    #             name='unique_user_following'
-    #         )
-    #     ]
-
 
 class Post(models.Model):
     text = models.TextField()
